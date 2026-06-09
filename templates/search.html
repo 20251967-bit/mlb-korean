@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}검색 결과 — MLB 한국어 가이드{% endblock %}
+
+{% block content %}
+<div class="search-page">
+  <div class="section-inner">
+    <h1 class="search-title">🔍 선수 검색</h1>
+    <div class="search-bar-wrap">
+      <input type="text" id="search-input" class="search-input-lg" value="{{ query }}" placeholder="선수 이름 검색 — 한국어 또는 영문" />
+      <button class="search-btn-lg" onclick="doSearch()">검색</button>
+    </div>
+    <div id="search-results" class="search-results-grid"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const initialQuery = {{ query | tojson }};
+if (initialQuery) doSearch();
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const container = document.getElementById('search-results');
+  container.innerHTML = '<div class="loading-msg">검색 중…</div>';
+
+  try {
+    const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    const people = d.people || [];
+
+    if (!people.length) {
+      container.innerHTML = '<div class="no-data">검색 결과가 없습니다. 한국어 또는 영문 이름으로 검색해보세요.</div>';
+      return;
+    }
+
+    container.innerHTML = people.slice(0, 20).map(p => {
+      const krName = p.fullNameKr || '';
+      return `
+      <div class="search-result-card" onclick="location.href='/player/${p.id}'">
+        <img
+          src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.id}/headshot/67/current"
+          alt="${p.fullName}" class="src-photo"
+        />
+        <div class="src-info">
+          <h3 class="src-name">${krName ? krName + ' ' : ''}<span style="font-weight:400;color:#94a3b8">${p.fullName}</span></h3>
+          <p class="src-pos">${p.primaryPosition?.name || p.primaryPosition?.abbreviation || ''}</p>
+          <p class="src-team">${p.currentTeam?.name || ''}</p>
+        </div>
+        <span class="src-arrow">→</span>
+      </div>`;
+    }).join('');
+  } catch {
+    container.innerHTML = '<div class="no-data">검색 중 오류가 발생했습니다.</div>';
+  }
+}
+</script>
+{% endblock %}

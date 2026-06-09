@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}⚾ MLB 한국어 가이드{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">⚾ MLB 가이드</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">홈</a>
+        <a href="/games" class="nav-link {% if request.path == '/games' %}active{% endif %}">경기 결과</a>
+        <a href="/glossary" class="nav-link {% if request.path == '/glossary' %}active{% endif %}">용어 사전</a>
+      </div>
+      <div class="nav-search-wrap">
+        <input type="text" id="nav-search-input" class="nav-search-input" placeholder="선수 검색 (한국어·영문)…" autocomplete="off" />
+        <button class="nav-search-btn" onclick="navSearch()">🔍</button>
+        <div id="nav-search-dropdown" class="search-dropdown hidden"></div>
+      </div>
+    </div>
+  </nav>
+
+  <main>{% block content %}{% endblock %}</main>
+
+  <footer>
+    <div class="footer-inner">
+      <p>데이터 출처: <a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener">Baseball Savant</a> &amp; MLB Stats API</p>
+      <p>AI 분석: <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a> (DeepSeek V4 Flash)</p>
+      <p class="footer-disclaimer">본 사이트는 비상업적 목적으로 제작되었으며 MLB 공식 사이트가 아닙니다.</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}경기 결과 — MLB 한국어 가이드{% endblock %}
+
+{% block content %}
+<div class="games-page">
+  <div class="section-inner">
+
+    <div class="games-header">
+      <h1 class="games-title">⚾ 경기 결과 / 일정</h1>
+      <div class="date-nav">
+        <button class="date-nav-btn" id="btn-prev" onclick="changeDate(-1)">◀ 이전날</button>
+        <input type="date" id="date-picker" class="date-picker" onchange="loadGames(this.value)" />
+        <button class="date-nav-btn" id="btn-next" onclick="changeDate(1)">다음날 ▶</button>
+        <button class="date-nav-btn today-btn" onclick="goToday()">오늘</button>
+      </div>
+    </div>
+
+    <div id="games-date-label" class="games-date-label"></div>
+    <div id="games-container" class="games-container">
+      <div class="loading-msg">경기 정보를 불러오는 중…</div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const KOREAN_TEAM_IDS = new Set(); // 한국 선수 소속팀 ID (동적)
+// MLB 액티브 로스터에 있는 한국 선수만 포함
+const KR_PLAYER_TEAMS = {
+  808982: 137, // 이정후  - SF Giants (MLB)
+  673490: 144, // 김하성  - Atlanta Braves (MLB)
+  808975: 119, // 김혜성  - LA Dodgers (MLB)
+  823550: 135, // 송성문  - SD Padres (MLB)
+  // 고우석: Toledo Mud Hens (AAA) — MLB 미등록
+  // 배지환: Syracuse Mets (AAA)  — MLB 미등록
+};
+Object.values(KR_PLAYER_TEAMS).forEach(id => KOREAN_TEAM_IDS.add(id));
+
+let currentDate = new Date().toISOString().slice(0, 10);
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('date-picker').value = currentDate;
+  loadGames(currentDate);
+});
+
+function goToday() {
+  currentDate = new Date().toISOString().slice(0, 10);
+  document.getElementById('date-picker').value = currentDate;
+  loadGames(currentDate);
+}
+
+function changeDate(delta) {
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().slice(0, 10);
+  document.getElementById('date-picker').value = currentDate;
+  loadGames(currentDate);
+}
+
+async function loadGames(date) {
+  currentDate = date;
+  const container = document.getElementById('games-container');
+  const label = document.getElementById('games-date-label');
+  container.innerHTML = '<div class="loading-msg">불러오는 중…</div>';
+
+  try {
+    const r = await fetch('/api/schedule?date=' + date);
+    const d = await r.json();
+    const games = d.games || [];
+
+    const [y, m, day] = date.split('-');
+    const weekdays = ['일','월','화','수','목','금','토'];
+    const dt = new Date(date + 'T12:00:00');
+    label.textContent = `${y}년 ${parseInt(m)}월 ${parseInt(day)}일 (${weekdays[dt.getDay()]}) · ${games.length}경기`;
+
+    if (!games.length) {
+      container.innerHTML = '<div class="no-data">이 날은 경기가 없습니다.</div>';
+      return;
+    }
+
+    // 한국 선수 출전 팀 경기를 맨 위로
+    games.sort((a, b) => {
+      const aKr = KOREAN_TEAM_IDS.has(a.away.id) || KOREAN_TEAM_IDS.has(a.home.id);
+      const bKr = KOREAN_TEAM_IDS.has(b.away.id) || KOREAN_TEAM_IDS.has(b.home.id);
+      return bKr - aKr;
+    });
+
+    container.innerHTML = games.map(g => renderGame(g)).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="no-data">경기 정보를 불러올 수 없습니다.</div>';
+  }
+}
+
+function renderGame(g) {
+  const isDone = g.statusCode === 'F' || g.statusCode === 'O';
+  const isLive = g.statusCode === 'I' || g.statusCode === 'MR' || g.statusCode === 'IR';
+  const isScheduled = g.statusCode === 'S' || g.statusCode === 'PW';
+
+  const awayWin = g.away.isWinner;
+  const homeWin = g.home.isWinner;
+  const hasKr = KOREAN_TEAM_IDS.has(g.away.id) || KOREAN_TEAM_IDS.has(g.home.id);
+
+  // 경기 시간 (UTC→KST +9)
+  let timeStr = '';
+  if (g.gameDate) {
+    const dt = new Date(g.gameDate);
+    const kst = new Date(dt.getTime() + 9 * 3600 * 1000);
+    timeStr = `${String(kst.getUTCHours()).padStart(2,'0')}:${String(kst.getUTCMinutes()).padStart(2,'0')} KST`;
+  }
+
+  // 점수
+  const awayScore = g.away.score ?? (isScheduled ? '' : '-');
+  const homeScore = g.home.score ?? (isScheduled ? '' : '-');
+
+  // 이닝별 점수표
+  let inningTable = '';
+  if ((isDone || isLive) && g.innings.length) {
+    const nums = g.innings.map(i => `<th>${i.num}</th>`).join('');
+    const awayRuns = g.innings.map(i => `<td>${i.away === null ? 'X' : i.away}</td>`).join('');
+    const homeRuns = g.innings.map(i => `<td>${i.home === null ? 'X' : i.home}</td>`).join('');
+    const ls = g.linescore;
+    inningTable = `
+      <div class="inning-table-wrap">
+        <table class="inning-table">
+          <thead><tr><th></th>${nums}<th>R</th><th>H</th><th>E</th></tr></thead>
+          <tbody>
+            <tr class="${awayWin?'winner-row':''}"><td class="team-cell">${g.away.nameKr}</td>${awayRuns}<td class="total-cell">${awayScore}</td><td>${ls.away.hits}</td><td>${ls.away.errors}</td></tr>
+            <tr class="${homeWin?'winner-row':''}"><td class="team-cell">${g.home.nameKr}</td>${homeRuns}<td class="total-cell">${homeScore}</td><td>${ls.home.hits}</td><td>${ls.home.errors}</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // 승패/세이브 투수
+  let decisionHtml = '';
+  if (isDone && g.decisions.winner) {
+    decisionHtml = `<div class="game-decisions">
+      <span class="dec-item dec-win">승 ${g.decisions.winner}</span>
+      ${g.decisions.loser ? `<span class="dec-item dec-lose">패 ${g.decisions.loser}</span>` : ''}
+      ${g.decisions.save ? `<span class="dec-item dec-save">세이브 ${g.decisions.save}</span>` : ''}
+    </div>`;
+  }
+
+  // 예상 선발
+  let pitcherHtml = '';
+  if (isScheduled && (g.away.probablePitcher || g.home.probablePitcher)) {
+    pitcherHtml = `<div class="game-pitchers">
+      <span>선발: ${g.away.probablePitcher || '미정'} vs ${g.home.probablePitcher || '미정'}</span>
+    </div>`;
+  }
+
+  // 진행 중 상태
+  let liveStatus = '';
+  if (isLive) {
+    const half = g.linescore.inningHalf === 'Top' ? '초' : '말';
+    liveStatus = `<span class="live-badge">● LIVE · ${g.linescore.inning}회 ${half}</span>`;
+  }
+
+  return `
+    <div class="game-card ${hasKr ? 'kr-game' : ''} ${isLive ? 'live-game' : ''}">
+      ${hasKr ? '<div class="kr-game-badge">🇰🇷 한국 선수 출전팀</div>' : ''}
+      <div class="game-card-header">
+        <div class="game-teams">
+          <div class="game-team ${awayWin ? 'winner' : ''}">
+            <span class="team-name-kr">${g.away.nameKr}</span>
+            <span class="team-name-en">${g.away.name}</span>
+          </div>
+          <div class="game-score-box">
+            ${isScheduled
+              ? `<span class="game-time">${timeStr}</span>`
+              : `<span class="score away-score ${awayWin ? 'win-score' : ''}">${awayScore}</span>
+                 <span class="score-sep">:</span>
+                 <span class="score home-score ${homeWin ? 'win-score' : ''}">${homeScore}</span>`
+            }
+            <div class="game-status ${isLive ? 'status-live' : ''}">${liveStatus || g.status}</div>
+          </div>
+          <div class="game-team home ${homeWin ? 'winner' : ''}">
+            <span class="team-name-kr">${g.home.nameKr}</span>
+            <span class="team-name-en">${g.home.name}</span>
+          </div>
+        </div>
+      </div>
+      ${inningTable}
+      ${decisionHtml}
+      ${pitcherHtml}
+    </div>`;
+}
+</script>
+{% endblock %}

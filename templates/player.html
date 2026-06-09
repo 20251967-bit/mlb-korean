@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}선수 정보 — MLB 한국어 가이드{% endblock %}
+
+{% block content %}
+<div class="player-page" id="player-page">
+
+  <!-- 로딩 -->
+  <div class="player-loading" id="player-loading">
+    <div class="spinner"></div>
+    <p>선수 정보를 불러오는 중…</p>
+  </div>
+
+  <!-- 선수 헤더 -->
+  <div class="player-header hidden" id="player-header">
+    {% if korean_info %}
+    <div class="kr-banner">🇰🇷 한국인 선수</div>
+    {% endif %}
+    <div class="player-header-inner">
+      <div class="player-photo-wrap">
+        <img id="player-photo" src="" alt="" class="player-photo-big" />
+      </div>
+      <div class="player-info-block">
+        <p class="player-position-badge" id="player-pos-badge"></p>
+        <h1 class="player-name-kr" id="player-name-kr">
+          {% if korean_info %}{{ korean_info.name_kr }}{% endif %}
+        </h1>
+        <p class="player-name-en" id="player-name-en"></p>
+        <p class="player-team-name" id="player-team"></p>
+        <p class="player-bio-kr" id="player-bio"></p>
+        <div class="player-header-links" id="player-links"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 타격 기록 -->
+  <div class="stats-section hidden" id="batting-section">
+    <div class="section-inner">
+      <h2 class="stats-section-title">🏏 {{ season }} 타격 기록</h2>
+      <div class="stats-grid" id="batting-grid"></div>
+
+      <div class="stats-table-wrap">
+        <table class="stats-table" id="batting-table">
+          <thead>
+            <tr>
+              <th>경기</th><th>타수</th><th>안타</th><th>2루타</th><th>3루타</th>
+              <th>홈런</th><th>타점</th><th>득점</th><th>도루</th>
+              <th>타율</th><th>출루율</th><th>장타율</th><th>OPS</th>
+            </tr>
+          </thead>
+          <tbody id="batting-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 투구 기록 -->
+  <div class="stats-section hidden" id="pitching-section">
+    <div class="section-inner">
+      <h2 class="stats-section-title">⚾ {{ season }} 투구 기록</h2>
+      <div class="stats-grid" id="pitching-grid"></div>
+
+      <div class="stats-table-wrap">
+        <table class="stats-table" id="pitching-table">
+          <thead>
+            <tr>
+              <th>경기</th><th>선발</th><th>승</th><th>패</th><th>세이브</th>
+              <th>이닝</th><th>삼진</th><th>볼넷</th><th>피홈런</th>
+              <th>평자책(ERA)</th><th>WHIP</th><th>K/9</th><th>BB/9</th>
+            </tr>
+          </thead>
+          <tbody id="pitching-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 기록 없음 -->
+  <div class="no-stats-section hidden" id="no-stats-section">
+    <div class="section-inner">
+      <div class="no-stats-msg">
+        <p>📭 {{ season }}시즌 기록이 아직 없습니다.</p>
+        <p>부상, 마이너리그, 또는 시즌 전 상황일 수 있습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수상 경력 -->
+  <div class="awards-section hidden" id="awards-section">
+    <div class="section-inner">
+      <h2 class="stats-section-title">🏅 수상 경력</h2>
+      <div id="awards-content"></div>
+    </div>
+  </div>
+
+  <!-- AI 분석 -->
+  <div class="ai-section hidden" id="ai-section">
+    <div class="section-inner">
+      <h2 class="stats-section-title">🤖 AI 선수 분석</h2>
+      <div class="ai-box">
+        <div id="ai-content" class="ai-content">
+          <button class="ai-gen-btn" onclick="generateAnalysis()">AI 분석 생성하기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Baseball Savant 링크 -->
+  <div class="savant-section hidden" id="savant-section">
+    <div class="section-inner">
+      <a id="savant-link" href="#" target="_blank" rel="noopener" class="savant-btn">
+        📈 Baseball Savant에서 Statcast 기록 보기 →
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PLAYER_ID = {{ player_id }};
+let playerData = null;
+
+document.addEventListener('DOMContentLoaded', loadPlayer);
+
+async function loadPlayer() {
+  try {
+    const r = await fetch('/api/player/' + PLAYER_ID);
+    playerData = await r.json();
+    renderPlayer(playerData);
+    loadAwards();
+  } catch(e) {
+    document.getElementById('player-loading').innerHTML = '<p class="error-msg">선수 정보를 불러오지 못했습니다.</p>';
+  }
+}
+
+function renderPlayer(d) {
+  const info = d.info || {};
+  const nameEn = info.fullName || '';
+  const team = info.currentTeam?.name || '';
+  const pos = info.primaryPosition?.abbreviation || '';
+  const posKr = posKrMap(pos);
+
+  // photo
+  const photo = document.getElementById('player-photo');
+  photo.src = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${PLAYER_ID}/headshot/67/current`;
+  photo.alt = nameEn;
+
+  setText('player-name-en', nameEn);
+  setText('player-team', team);
+  setText('player-pos-badge', posKr || pos);
+  if (!document.getElementById('player-name-kr').textContent.trim()) {
+    setText('player-name-kr', nameEn);
+  }
+
+  // 소개글: 한국 선수 > 하드코딩 bio > AI 자동 생성
+  const bioEl = document.getElementById('player-bio');
+  if (d.korean_info?.bio_kr) {
+    bioEl.textContent = d.korean_info.bio_kr;
+  } else if (d.bio_kr) {
+    bioEl.textContent = d.bio_kr;
+  } else {
+    bioEl.textContent = '소개글을 불러오는 중…';
+    generateBio(nameEn, team, posKr, d);
+  }
+
+  // savant link
+  if (d.savant_url) {
+    const sl = document.getElementById('savant-link');
+    sl.href = d.savant_url;
+    show('savant-section');
+  }
+
+  // Batting
+  const battingStats = d.hitting?.[0]?.splits?.[0]?.stat;
+  const pitchingStats = d.pitching?.[0]?.splits?.[0]?.stat;
+
+  if (battingStats) {
+    renderBatting(battingStats);
+    show('batting-section');
+    show('ai-section');
+  }
+  if (pitchingStats) {
+    renderPitching(pitchingStats);
+    show('pitching-section');
+    show('ai-section');
+  }
+  if (!battingStats && !pitchingStats) {
+    show('no-stats-section');
+  }
+
+  // Player links
+  const linksEl = document.getElementById('player-links');
+  linksEl.innerHTML = `<a href="https://www.mlb.com/player/${PLAYER_ID}" target="_blank" rel="noopener" class="ext-link">MLB.com 프로필 →</a>`;
+
+  hide('player-loading');
+  show('player-header');
+}
+
+function renderBatting(s) {
+  const grid = document.getElementById('batting-grid');
+  grid.innerHTML = [
+    statCard('타율', fmtAvg(s.avg), 'AVG', '.300 이상 우수'),
+    statCard('출루율', fmtAvg(s.obp), 'OBP', '.370 이상 우수'),
+    statCard('장타율', fmtAvg(s.slg), 'SLG', '.500 이상 우수'),
+    statCard('OPS', fmtAvg(s.ops), 'OPS', '.900 이상 최상급'),
+    statCard('홈런', s.homeRuns ?? '-', 'HR', ''),
+    statCard('타점', s.rbi ?? '-', 'RBI', ''),
+  ].join('');
+
+  const tbody = document.getElementById('batting-tbody');
+  tbody.innerHTML = `<tr>
+    <td>${s.gamesPlayed??'-'}</td><td>${s.atBats??'-'}</td><td>${s.hits??'-'}</td>
+    <td>${s.doubles??'-'}</td><td>${s.triples??'-'}</td><td>${s.homeRuns??'-'}</td>
+    <td>${s.rbi??'-'}</td><td>${s.runs??'-'}</td><td>${s.stolenBases??'-'}</td>
+    <td>${fmtAvg(s.avg)}</td><td>${fmtAvg(s.obp)}</td><td>${fmtAvg(s.slg)}</td>
+    <td>${fmtAvg(s.ops)}</td>
+  </tr>`;
+}
+
+function renderPitching(s) {
+  const grid = document.getElementById('pitching-grid');
+  grid.innerHTML = [
+    statCard('평균자책점', fmtEra(s.era), 'ERA', '3.00 이하 우수'),
+    statCard('WHIP', fmtEra(s.whip), 'WHIP', '1.10 이하 우수'),
+    statCard('승리', s.wins ?? '-', 'W', ''),
+    statCard('패배', s.losses ?? '-', 'L', ''),
+    statCard('탈삼진', s.strikeOuts ?? '-', 'K', ''),
+    statCard('이닝', s.inningsPitched ?? '-', 'IP', ''),
+  ].join('');
+
+  const tbody = document.getElementById('pitching-tbody');
+  tbody.innerHTML = `<tr>
+    <td>${s.gamesPitched??'-'}</td><td>${s.gamesStarted??'-'}</td>
+    <td>${s.wins??'-'}</td><td>${s.losses??'-'}</td><td>${s.saves??'-'}</td>
+    <td>${s.inningsPitched??'-'}</td><td>${s.strikeOuts??'-'}</td><td>${s.baseOnBalls??'-'}</td>
+    <td>${s.homeRuns??'-'}</td><td>${fmtEra(s.era)}</td><td>${fmtEra(s.whip)}</td>
+    <td>${fmtEra(s.strikeoutsPer9Inn)}</td><td>${fmtEra(s.walksPer9Inn)}</td>
+  </tr>`;
+}
+
+function statCard(label, val, abbr, hint) {
+  return `<div class="stat-card">
+    <span class="sc-val">${val}</span>
+    <span class="sc-label">${label}</span>
+    <span class="sc-abbr">${abbr}</span>
+    ${hint ? `<span class="sc-hint">${hint}</span>` : ''}
+  </div>`;
+}
+
+async function generateAnalysis() {
+  if (!playerData) return;
+  const btn = document.querySelector('.ai-gen-btn');
+  if (btn) btn.textContent = '분석 생성 중…';
+
+  const hitting = playerData.hitting?.[0]?.splits?.[0]?.stat;
+  const pitching = playerData.pitching?.[0]?.splits?.[0]?.stat;
+  const stats = hitting || pitching || {};
+  const name = document.getElementById('player-name-kr').textContent || document.getElementById('player-name-en').textContent;
+
+  try {
+    const r = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, stats})
+    });
+    const d = await r.json();
+    document.getElementById('ai-content').innerHTML = `<div class="ai-result">${(d.analysis||d.error||'분석 실패').replace(/\n/g,'<br>')}</div>`;
+  } catch {
+    document.getElementById('ai-content').innerHTML = '<div class="ai-result error-msg">분석을 생성할 수 없습니다.</div>';
+  }
+}
+
+async function loadAwards() {
+  try {
+    const r = await fetch(`/api/player/${PLAYER_ID}/awards`);
+    const d = await r.json();
+    const awards = d.awards || [];
+    if (!awards.length) return;
+
+    show('awards-section');
+
+    // 중요도 1: 최고 수상 / 2: 주요 수상 / 3: 기타
+    const tier1 = awards.filter(a => a.tier === 1);
+    const tier2 = awards.filter(a => a.tier === 2);
+    const tier3 = awards.filter(a => a.tier === 3);
+
+    let html = '';
+
+    if (tier1.length || tier2.length) {
+      html += '<div class="awards-major">';
+      [...tier1, ...tier2].forEach(a => {
+        html += `<div class="award-badge tier${a.tier}">
+          <span class="award-emoji">${a.emoji}</span>
+          <div class="award-info">
+            <span class="award-name">${a.name_kr}</span>
+            <span class="award-season">${a.season}년</span>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if (tier3.length) {
+      // 올스타 등 반복 수상은 횟수로 요약
+      const grouped = {};
+      tier3.forEach(a => {
+        if (!grouped[a.name_kr]) grouped[a.name_kr] = {emoji: a.emoji, seasons: []};
+        grouped[a.name_kr].seasons.push(a.season);
+      });
+      html += '<div class="awards-minor">';
+      Object.entries(grouped).forEach(([name, g]) => {
+        const count = g.seasons.length;
+        const label = count > 1 ? `${count}회 선정` : `${g.seasons[0]}년`;
+        html += `<span class="award-chip">${g.emoji} ${name} <em>${label}</em></span>`;
+      });
+      html += '</div>';
+    }
+
+    document.getElementById('awards-content').innerHTML = html;
+  } catch(e) { /* 수상 없으면 섹션 숨김 유지 */ }
+}
+
+async function generateBio(nameEn, team, position, d) {
+  const bioEl = document.getElementById('player-bio');
+  try {
+    const hitting = d.hitting?.[0]?.splits?.[0]?.stat || {};
+    const pitching = d.pitching?.[0]?.splits?.[0]?.stat || {};
+    const stats = Object.keys(hitting).length ? {
+      타율: hitting.avg, 홈런: hitting.homeRuns, OPS: hitting.ops
+    } : Object.keys(pitching).length ? {
+      ERA: pitching.era, 탈삼진: pitching.strikeOuts, WHIP: pitching.whip
+    } : {};
+
+    const r = await fetch('/api/bio', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name_en: nameEn, team, position, stats})
+    });
+    const data = await r.json();
+    bioEl.textContent = data.bio || '';
+  } catch {
+    bioEl.textContent = '';
+  }
+}
+
+function posKrMap(pos) {
+  const m = {SP:'선발투수',RP:'구원투수',CP:'마무리투수',C:'포수',
+    '1B':'1루수','2B':'2루수','3B':'3루수',SS:'유격수',
+    LF:'좌익수',CF:'중견수',RF:'우익수',OF:'외야수',DH:'지명타자'};
+  return m[pos] || pos;
+}
+function setText(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
+function show(id) { document.getElementById(id)?.classList.remove('hidden'); }
+function hide(id) { document.getElementById(id)?.classList.add('hidden'); }
+function fmtAvg(v) { return v!=null ? Number(v).toFixed(3) : '-'; }
+function fmtEra(v) { return v!=null ? Number(v).toFixed(2) : '-'; }
+</script>
+{% endblock %}

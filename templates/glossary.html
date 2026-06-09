@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}야구 용어 사전 — MLB 한국어 가이드{% endblock %}
+
+{% block content %}
+
+<div class="glossary-page">
+
+  <!-- 헤더 -->
+  <div class="glossary-hero">
+    <h1 class="glossary-hero-title">📖 야구 용어 사전</h1>
+    <p class="glossary-hero-sub">WAR? FIP? 배럴? — MLB의 복잡한 용어를 쉽게 설명해드립니다</p>
+    <div class="glossary-search-wrap">
+      <input type="text" id="glossary-search" class="glossary-search-input" placeholder="용어 검색…" oninput="filterGlossary(this.value)" />
+    </div>
+  </div>
+
+  <!-- AI 용어 질문 -->
+  <div class="ai-ask-box">
+    <h3 class="ai-ask-title">🤖 AI에게 야구 용어 물어보기</h3>
+    <p class="ai-ask-sub">궁금한 야구 용어를 입력하면 AI가 쉽게 설명해드립니다</p>
+    <div class="ai-ask-input-row">
+      <input type="text" id="ai-term-input" class="ai-ask-input" placeholder="예: WAR, 배럴, xFIP, 스프린트 스피드…" />
+      <button class="ai-ask-btn" onclick="askAI()">AI 설명 요청</button>
+    </div>
+    <div id="ai-ask-result" class="ai-ask-result hidden"></div>
+  </div>
+
+  <!-- 용어 목록 -->
+  <div class="glossary-body">
+    {% for category, terms in glossary.items() %}
+    <div class="gloss-category" data-category="{{ category }}">
+      <h2 class="gloss-cat-title">{{ category }}</h2>
+      <div class="gloss-terms-grid">
+        {% for item in terms %}
+        <div class="gloss-term-card" data-term="{{ item.term }}" data-detail="{{ item.detail }}">
+          <div class="gtc-header">
+            <h3 class="gtc-term">{{ item.term }}</h3>
+            <span class="gtc-short">{{ item.short }}</span>
+          </div>
+          <p class="gtc-detail">{{ item.detail }}</p>
+          <button class="gtc-ai-btn" onclick="askTermAI('{{ item.term }}', event)">🤖 AI에게 더 자세히 물어보기</button>
+          <div class="gtc-ai-result hidden"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- 검색 결과 없음 -->
+    <div id="no-results" class="no-results hidden">
+      <p>검색 결과가 없습니다. AI에게 직접 물어보세요! 👆</p>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterGlossary(query) {
+  const q = query.toLowerCase().trim();
+  const categories = document.querySelectorAll('.gloss-category');
+  let anyVisible = false;
+
+  categories.forEach(cat => {
+    const cards = cat.querySelectorAll('.gloss-term-card');
+    let catVisible = false;
+    cards.forEach(card => {
+      const text = card.dataset.term.toLowerCase() + card.dataset.detail.toLowerCase();
+      const show = !q || text.includes(q);
+      card.classList.toggle('hidden', !show);
+      if (show) catVisible = true;
+    });
+    cat.classList.toggle('hidden', !catVisible);
+    if (catVisible) anyVisible = true;
+  });
+
+  document.getElementById('no-results').classList.toggle('hidden', anyVisible);
+}
+
+async function askAI() {
+  const input = document.getElementById('ai-term-input');
+  const term = input.value.trim();
+  if (!term) { input.focus(); return; }
+
+  const result = document.getElementById('ai-ask-result');
+  result.classList.remove('hidden');
+  result.innerHTML = '<div class="ai-loading">⏳ AI가 설명을 작성하는 중…</div>';
+
+  try {
+    const r = await fetch('/api/explain', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({term})
+    });
+    const d = await r.json();
+    if (d.error) {
+      result.innerHTML = `<div class="ai-error">⚠️ ${d.error}</div>`;
+    } else {
+      result.innerHTML = `<div class="ai-explain-result"><strong>📝 "${term}" AI 설명</strong><div class="ai-text">${(d.explanation||'').replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div></div>`;
+    }
+  } catch {
+    result.innerHTML = '<div class="ai-error">⚠️ 설명을 가져올 수 없습니다. 잠시 후 다시 시도해주세요.</div>';
+  }
+}
+
+async function askTermAI(term, event) {
+  const btn = event.target;
+  const resultEl = btn.nextElementSibling;
+  resultEl.classList.remove('hidden');
+  resultEl.innerHTML = '<div class="ai-loading">⏳ AI 설명 생성 중…</div>';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch('/api/explain', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({term})
+    });
+    const d = await r.json();
+    if (d.error) {
+      resultEl.innerHTML = `<div class="ai-error">⚠️ ${d.error}</div>`;
+    } else {
+      resultEl.innerHTML = `<div class="ai-text">${(d.explanation||'').replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>`;
+    }
+  } catch {
+    resultEl.innerHTML = '<div class="ai-error">⚠️ 오류가 발생했습니다.</div>';
+  }
+  btn.textContent = '🔄 다시 생성';
+  btn.disabled = false;
+}
+
+// Enter key for AI search
+document.getElementById('ai-term-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') askAI();
+});
+</script>
+{% endblock %}

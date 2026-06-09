@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}⚾ MLB 한국어 가이드 — 메이저리그를 한국어로{% endblock %}
+
+{% block content %}
+
+<!-- ── 히어로 ── -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-badge">{{ season }} 시즌 실시간 기록</div>
+    <h1 class="hero-title">메이저리그를<br><span class="highlight">한국어</span>로 즐겨요</h1>
+    <p class="hero-sub">선수 기록·한국 선수 소식·야구 용어까지 모두 한국어로</p>
+    <div class="hero-search-box">
+      <input type="text" id="hero-search-input" class="hero-search-input" placeholder="선수 이름 검색 (한국어·영문 모두 가능)" autocomplete="off" />
+      <button class="hero-search-btn" onclick="heroSearch()">검색</button>
+      <div id="hero-search-dropdown" class="search-dropdown hidden"></div>
+    </div>
+    <div class="hero-tags">
+      <a href="/glossary" class="hero-tag">📖 용어 사전</a>
+      <span class="hero-tag">📊 Statcast 지표</span>
+      <span class="hero-tag">🤖 AI 분석</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── 한국인 선수 ── -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">🇰🇷 한국인 선수</h2>
+      <p class="section-sub">현재 메이저리그에서 활약 중인 우리 선수들</p>
+    </div>
+    <div class="korean-grid">
+      {% for p in korean_players %}
+      <article class="korean-card" onclick="location.href='/player/{{ p.id }}'">
+        <div class="kcard-photo-wrap">
+          <img
+            src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/{{ p.id }}/headshot/67/current"
+            alt="{{ p.name_kr }}"
+            class="kcard-photo"
+            onerror="this.src='https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/generic/headshot/67/current'"
+          />
+          <div class="kcard-flag">🇰🇷</div>
+          {% if p.status == 'minor' %}
+          <div class="kcard-minor-badge">AAA</div>
+          {% endif %}
+        </div>
+        <div class="kcard-body">
+          <h3 class="kcard-name">{{ p.name_kr }}</h3>
+          <p class="kcard-name-en">{{ p.name_en }}</p>
+          <p class="kcard-team" style="color:{{ p.team_color }}">{{ p.team_kr }}</p>
+          {% if p.status == 'minor' %}
+          <span class="kcard-status-minor">⚠️ 현재 마이너리그 (AAA)</span>
+          {% endif %}
+          <span class="kcard-pos">{{ p.position_kr }}</span>
+          <p class="kcard-bio">{{ p.bio_kr }}</p>
+          <div class="kcard-stats" id="kstats-{{ p.id }}">
+            <span class="stats-loading">기록 불러오는 중…</span>
+          </div>
+          <div class="kcard-cta">자세히 보기 →</div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── 리그 선두 기록 ── -->
+<section class="section section-dark">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">📊 {{ season }} 리그 선두</h2>
+    </div>
+    <div class="leaders-tabs">
+      <button class="tab-btn active" data-cat="homeRuns" onclick="loadLeaders('homeRuns',this)">홈런</button>
+      <button class="tab-btn" data-cat="battingAverage" onclick="loadLeaders('battingAverage',this)">타율</button>
+      <button class="tab-btn" data-cat="rbi" onclick="loadLeaders('rbi',this)">타점</button>
+      <button class="tab-btn" data-cat="strikeOuts" onclick="loadLeaders('strikeOuts',this)">탈삼진</button>
+      <button class="tab-btn" data-cat="era" onclick="loadLeaders('era',this)">평균자책점</button>
+      <button class="tab-btn" data-cat="onBasePlusSlugging" onclick="loadLeaders('onBasePlusSlugging',this)">OPS</button>
+    </div>
+    <div id="leaders-wrap" class="leaders-wrap">
+      <div class="loading-msg">불러오는 중…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 주목 선수 ── -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">⭐ 주목할 선수들</h2>
+      <p class="section-sub">{{ season }} 시즌 메이저리그를 이끄는 스타들</p>
+    </div>
+    <div class="featured-grid">
+      {% for p in featured_players %}
+      <article class="featured-card" onclick="location.href='/player/{{ p.id }}'">
+        <img
+          src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/{{ p.id }}/headshot/67/current"
+          alt="{{ p.name_kr }}"
+          class="fcard-photo"
+          onerror="this.src='https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/generic/headshot/67/current'"
+        />
+        <div class="fcard-body">
+          <h3 class="fcard-name">{{ p.name_kr }}</h3>
+          <p class="fcard-name-en">{{ p.name_en }}</p>
+          <p class="fcard-team">{{ p.team_kr }}</p>
+          <span class="fcard-pos">{{ p.position_kr }}</span>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── 팀 순위표 ── -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">🏆 {{ season }} 팀 순위</h2>
+    </div>
+    <div class="standings-tabs">
+      <button class="tab-btn active" onclick="showStandings('AL', this)">아메리칸리그 (AL)</button>
+      <button class="tab-btn" onclick="showStandings('NL', this)">내셔널리그 (NL)</button>
+    </div>
+    <div id="standings-wrap" class="standings-wrap">
+      <div class="loading-msg">불러오는 중…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 용어 사전 배너 ── -->
+<section class="section section-cta">
+  <div class="section-inner cta-inner">
+    <div>
+      <h2 class="cta-title">📖 야구 용어가 어렵게 느껴지시나요?</h2>
+      <p class="cta-sub">WAR, FIP, 배럴, 엑시트 벨로시티… AI가 쉽게 설명해드립니다</p>
+    </div>
+    <a href="/glossary" class="cta-btn">용어 사전 보기 →</a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const KOREAN_IDS = new Set([{{ korean_players | map(attribute='id') | join(',') }}]);
+const CURRENT_SEASON = {{ season }};
+
+let standingsData = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  {% for p in korean_players %}
+  loadKoreanStats({{ p.id }}, '{{ p.position_type }}');
+  {% endfor %}
+  loadLeaders('homeRuns', document.querySelector('.leaders-tabs .tab-btn.active'));
+  loadStandings();
+});
+
+async function loadKoreanStats(id, posType) {
+  const el = document.getElementById('kstats-' + id);
+  if (!el) return;
+  try {
+    const r = await fetch('/api/player/' + id);
+    const d = await r.json();
+    const isPitcher = posType === 'pitcher';
+    let html = '<div class="mini-stats">';
+    if (!isPitcher && d.hitting?.length) {
+      const s = d.hitting[0].splits?.[0]?.stat || {};
+      html += miniStat('타율', fmtAvg(s.avg)) + miniStat('홈런', s.homeRuns ?? '-') + miniStat('타점', s.rbi ?? '-') + miniStat('OPS', fmtAvg(s.ops));
+    } else if (isPitcher && d.pitching?.length) {
+      const s = d.pitching[0].splits?.[0]?.stat || {};
+      html += miniStat('평자책', fmtEra(s.era)) + miniStat('승', s.wins ?? '-') + miniStat('삼진', s.strikeOuts ?? '-') + miniStat('WHIP', fmtEra(s.whip));
+    } else {
+      html += '<span class="no-stats">시즌 기록 없음</span>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch {
+    el.innerHTML = '<span class="no-stats">기록 로드 실패</span>';
+  }
+}
+
+function miniStat(label, val) {
+  return `<div class="mini-stat"><span class="ms-val">${val}</span><span class="ms-label">${label}</span></div>`;
+}
+function fmtAvg(v) { return v != null ? Number(v).toFixed(3) : '-'; }
+function fmtEra(v) { return v != null ? Number(v).toFixed(2) : '-'; }
+
+const catLabels = {homeRuns:'홈런',battingAverage:'타율',rbi:'타점',strikeOuts:'탈삼진',era:'평균자책점',onBasePlusSlugging:'OPS'};
+
+async function loadLeaders(cat, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const wrap = document.getElementById('leaders-wrap');
+  wrap.innerHTML = '<div class="loading-msg">불러오는 중…</div>';
+  try {
+    const r = await fetch('/api/leaders?category=' + cat + '&limit=10');
+    const d = await r.json();
+    const leaders = d.leagueLeaders?.[0]?.leaders || [];
+    if (!leaders.length) { wrap.innerHTML = '<div class="no-data">데이터 없음</div>'; return; }
+
+    let html = `<table class="leaders-table"><thead><tr><th>순위</th><th>선수</th><th>팀</th><th>${catLabels[cat]||cat}</th></tr></thead><tbody>`;
+    leaders.forEach(l => {
+      const pid = l.person?.id;
+      const isKr = KOREAN_IDS.has(pid);
+      html += `<tr class="${isKr?'kr-row':''}" onclick="location.href='/player/${pid}'" style="cursor:pointer">
+        <td class="rank-cell">${l.rank}</td>
+        <td class="name-cell">${isKr?'🇰🇷 ':''}${l.person?.fullName||'-'}</td>
+        <td>${l.team?.abbreviation||'-'}</td>
+        <td class="val-cell">${l.value}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  } catch {
+    wrap.innerHTML = '<div class="no-data">데이터를 불러올 수 없습니다</div>';
+  }
+}
+
+// ── 팀 순위 ──
+const DIV_KR = {
+  'American League East': 'AL 동부',
+  'American League Central': 'AL 중부',
+  'American League West': 'AL 서부',
+  'National League East': 'NL 동부',
+  'National League Central': 'NL 중부',
+  'National League West': 'NL 서부',
+};
+
+async function loadStandings() {
+  try {
+    const r = await fetch('/api/standings');
+    const d = await r.json();
+    standingsData = d.records || [];
+    showStandings('AL', document.querySelector('.standings-tabs .tab-btn.active'));
+  } catch {
+    document.getElementById('standings-wrap').innerHTML = '<div class="no-data">순위 데이터를 불러올 수 없습니다</div>';
+  }
+}
+
+function showStandings(league, btn) {
+  document.querySelectorAll('.standings-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const wrap = document.getElementById('standings-wrap');
+  if (!standingsData) { wrap.innerHTML = '<div class="loading-msg">불러오는 중…</div>'; return; }
+
+  const filtered = standingsData.filter(r => r.league?.abbreviation === league || r.division?.name?.includes(league === 'AL' ? 'American' : 'National'));
+  if (!filtered.length) { wrap.innerHTML = '<div class="no-data">데이터 없음</div>'; return; }
+
+  let html = '<div class="standings-grid">';
+  filtered.forEach(record => {
+    const divName = DIV_KR[record.division?.name] || record.division?.name || '';
+    html += `<div class="standings-division">
+      <h3 class="standings-div-title">${divName}</h3>
+      <table class="standings-table">
+        <thead><tr><th>팀</th><th>승</th><th>패</th><th>승률</th><th>GB</th><th>최근 10경기</th></tr></thead>
+        <tbody>`;
+    (record.teamRecords || []).forEach(t => {
+      const isLeader = t.divisionRank === '1';
+      const kr = KOREAN_IDS.has(t.team?.id) ? '🇰🇷 ' : '';
+      html += `<tr class="${isLeader ? 'standings-leader' : ''}">
+        <td class="standings-team">${isLeader ? '🥇 ' : ''}${t.team?.name || '-'}</td>
+        <td>${t.wins}</td>
+        <td>${t.losses}</td>
+        <td>${t.winningPercentage || '-'}</td>
+        <td>${t.gamesBack === '-' ? '—' : t.gamesBack}</td>
+        <td class="standings-last10">${(r10 => r10 ? `${r10.wins}-${r10.losses}` : '-')(t.records?.splitRecords?.find(r => r.type === 'lastTen'))}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+</script>
+{% endblock %}
