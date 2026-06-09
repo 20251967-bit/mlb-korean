@@ -200,7 +200,7 @@ def call_openrouter(system_prompt, user_prompt, max_tokens=600):
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:5000",
+                    "HTTP-Referer": os.environ.get("APP_URL", "http://localhost:5001"),
                     "X-Title": "MLB Korean Guide",
                 },
                 json={
